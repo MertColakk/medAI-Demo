@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-init
+  namespace: xray-api
+spec:
+  backoffLimit: 4
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: psql
+          image: postgres:17
+          envFrom:
+            - configMapRef: { name: db-config }
+            - secretRef:    { name: db-secrets }
+          volumeMounts:
+            - name: init-sql
+              mountPath: /init
+              readOnly: true
+          command: ["/bin/bash","-lc"]
+          args:
+            - |
+              set -euo pipefail
+
+              : "${DB:?missing}"; : "${DB_HOST:?missing}"; : "${DB_PORT:?missing}"
+              : "${DB_USER:?missing}"; : "${DB_PASSWORD:?missing}"
+
+              export PGPASSWORD="$DB_PASSWORD"
+              echo "Waiting for Postgres at $DB_HOST:$DB_PORT as $DB_USER on DB=$DB ..."
+              for i in {1..60}; do
+                if pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" >/dev/null 2>&1; then
+                  echo "Postgres is ready."
+                  break
+                fi
+                sleep 2
+                if [ "$i" -eq 60 ]; then
+                  echo "ERROR: Postgres not ready in time" >&2
+                  exit 1
+                fi
+              done
+
+              test -f /init/init.sql || { echo "ERROR: /init/init.sql not found" >&2; exit 1; }
+
+              echo "Running init.sql ..."
+              psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB" --set=ON_ERROR_STOP=1 -f /init/init.sql
+      volumes:
+        - name: init-sql
+          configMap:
+            name: db-init-sql
+            items:
+              - key: init.sql
+                path: init.sql

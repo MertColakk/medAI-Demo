@@ -1,0 +1,6 @@
+TensorFlow 
+Keras 
+Flask 
+Pillow 
+Flask-SQLAlchemy
+psycopg2-binary

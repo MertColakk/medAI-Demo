@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: python-svc-mng
+  namespace: xray-api
+  labels:
+    app: python-api-mng
+spec:
+  type: NodePort
+  selector:
+    app: python-api-mng   
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      nodePort: 30080

@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-only-flask
+  namespace: xray-api
+spec:
+  podSelector:        
+    matchLabels:
+      app: python-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: python-api-mng
+      ports:
+        - protocol: TCP
+          port: 8001
