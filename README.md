@@ -1,1 +1,1 @@
-# medAI---Demo
+# medAI-Demo
