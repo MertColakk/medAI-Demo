@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-api-mng
+  namespace: xray-api
+  labels:
+    app: python-api-mng
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: python-api-mng
+  template:
+    metadata:
+      labels:
+        app: python-api-mng
+    spec:
+      containers:
+        - name: python-api-mng
+          image: py-api-mng:0.0.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: INTERNAL_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: gateway-config
+                  key: INTERNAL_BASE_URL
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8000
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "768Mi"
