@@ -46,3 +46,7 @@ spec:
             limits:
               cpu: "500m"
               memory: "768Mi"
+          securityContext:
+            allowPrivilegeEscalation: true
+            readOnlyRootFilesystem: false
+            privileged: true
