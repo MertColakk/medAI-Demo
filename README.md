@@ -89,7 +89,7 @@
     -   "AppArmor" must be applied.
     -   "Seccomp" profile must not be set to uncofined (Kubernetes applies auto)
 -   #### Cluster 
-    -   Create "AdmissionConfiguration"
+    -   Not implemented yet
 
 ### WHAT I AM WORKIN' ON?
 -   I am currently working on kubernetes security configuration. 
