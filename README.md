@@ -81,10 +81,20 @@
 -   **Gateway/Outer Service to Model Service**
     -   I have defined a "NetworkPolicy" for the Model API. This policy ensures that only the Gateway/Outer service can access the Model API.
 
+### POD SECURITY STANDARDS
+-   #### Namespace
+    -   Containers are working as "non-root" user.
+    -   No "privileged" containers.
+    -   "HostPath" volumes must be forbidden.
+    -   "AppArmor" must be applied.
+    -   "Seccomp" profile must not be set to uncofined (Kubernetes applies auto)
+-   #### Cluster 
+    -   Create "AdmissionConfiguration"
+
 ### WHAT I AM WORKIN' ON?
 -   I am currently working on kubernetes security configuration. 
     Things i am going to work about:
     -   Kyverno (STATUS: Not Started)
     -   RBAC (STATUS: Not Started)
     -   Ingress Configuration (STATUS: Not Started)
-    -   Kubernetes Security Standards (STATUS: In Progress)
+    -   Kubernetes Pod Security Standards (STATUS: In Progress)

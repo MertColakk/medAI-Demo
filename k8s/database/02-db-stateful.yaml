@@ -60,6 +60,10 @@ spec:
               memory: "256Mi"
             limits:
               memory: "512Mi"
+          securityContext:
+            allowPrivilegeEscalation: true
+            readOnlyRootFilesystem: false
+            privileged: true
   volumeClaimTemplates:
     - metadata:
         name: data
