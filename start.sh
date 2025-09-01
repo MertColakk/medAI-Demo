@@ -1,2 +1,2 @@
 #!/bin/bash
-minikube service python-api-svc -n xray-api --url
+minikube service -n xray-api python-api-svc --url

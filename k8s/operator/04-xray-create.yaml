@@ -1,0 +1,7 @@
+apiVersion: medai.mertcolakk.io/v1alpha1
+kind: XrayApp
+metadata:
+  name: python-api
+  namespace: xray-api
+spec:
+  image: py-api:0.0.1

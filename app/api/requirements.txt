@@ -4,3 +4,5 @@ Flask
 Pillow 
 Flask-SQLAlchemy
 psycopg2-binary
+kopf
+kubernetes
