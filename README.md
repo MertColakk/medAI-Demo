@@ -1,18 +1,18 @@
 ## DESCRIPTION
 ### KUBERNETES OBJECTS WHICH IS USED
--   ***Namespace***
--   ***ConfigMap***
--   ***Secrets***
--   ***HorizontalPodAutoscaler***
--   ***ResourceQuota (Namespace level resource management)*** 
--   ***LimitRange (Container level resource management)***
--   ***Service***
--   ***Job***
--   ***Deployment***
--   ***StatefulSet***
--   ***ServiceAccount***
--   ***PodDisruptionBudget***
--   ***RBAC***
+-   Namespace
+-   ConfigMap
+-   Secrets
+-   HorizontalPodAutoscaler
+-   ResourceQuota (Namespace level resource management) 
+-   LimitRange (Container level resource management)
+-   Service
+-   Job
+-   Deployment
+-   StatefulSet
+-   ServiceAccount
+-   PodDisruptionBudget
+-   RBAC
 
 ### COMPONENTS OF APPLICATION
     -   PostgreSQL
