@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: python-api-pdb
+  namespace: xray-api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: python-api

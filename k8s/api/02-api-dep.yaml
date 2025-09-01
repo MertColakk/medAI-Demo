@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-api
+  namespace: xray-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: python-api
+  template:
+    metadata:
+      labels:
+        app: python-api
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/python-api: runtime/default
+    spec:
+      serviceAccountName: python-api-sa
+      automountServiceAccountToken: false
+      containers:
+        - name: python-api
+          image: py-api:0.0.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8001
+          envFrom:
+            - configMapRef: { name: db-config }
+            - secretRef:    { name: db-secrets }
+          readinessProbe:
+            httpGet:
+              path: /api/readyz
+              port: 8001
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/livez
+              port: 8001
+            initialDelaySeconds: 10
+          resources:
+            requests: { cpu: "300m", memory: "384Mi" }
+            limits:   { cpu: "1",    memory: "768Mi" }
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile: { type: RuntimeDefault }
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

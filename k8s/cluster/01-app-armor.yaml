@@ -1,0 +1,15 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-apparmor
+spec:
+  validationFailureAction: enforce
+  rules:
+  - name: apparmor-runtime-default
+    match: { resources: { kinds: ["Pod"], namespaces: ["xray-api"] } }
+    validate:
+      message: "AppArmor must be runtime/default"
+      pattern:
+        metadata:
+          annotations:
+            "container.apparmor.security.beta.kubernetes.io/*": "runtime/default"
