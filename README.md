@@ -155,9 +155,19 @@
     -   Images using the latest tag are disallowed to prevent non-deterministic deployments.
 
 ## INSTALL & RUN
--   **1 - Run "install.sh"**
--   **2 - Run "start.sh"**
--   **(Optional) - Run "database.sh" if you want to access into database shell.**
+```bash
+# Give execution permit into scripts (only for 1 time)
+chmod +x install.sh start.sh database.sh
+
+# Start installation
+./install.sh
+
+# Start service (local)
+./start.sh
+
+# Access into database (Optional)
+./database.sh
+```
 
 ## CODE REVIEW
 ### 1- AI MODEL STRUCTURE
@@ -564,3 +574,4 @@ def reconcile(spec, name, namespace, body, **_) -> dict:
 def cleanup(**_) -> None:
     pass
 ```
+
