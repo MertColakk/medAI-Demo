@@ -55,8 +55,6 @@
             -   pod-sa-automount
         -   ClusterPolicy: disallow-latest-tag
             -   no-latest
-        -   ClusterPolicy: require-resources-and-probes
-            -   resource-limits
 
 ### THE USED ADDONS IN KUBERNETES
     -   metrics-server -> for HPA
