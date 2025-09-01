@@ -14,9 +14,12 @@
 -   PodDisruptionBudget
 -   RBAC
 
-### COMPONENTS OF APPLICATION
+### TECHNOLOGIES OF APPLICATION
     -   PostgreSQL
-    -   Image Classification API with "Flask"
+    -   Flask - Tensorflow
+    -   Kyverno
+    -   Docker
+    -   Kubernetes
 
 ## ABOUT SYSTEM
 ### NAMES OF KUBERNETES OBJECTS
@@ -48,15 +51,12 @@
         -   ClusterPolicy: enforce-pod-security-restricted
             -   require-seccomp
             -   require-container-security
-        -   ClusterPolicy: require-apparmor
-            -   apparmor-runtime-default
         -   ClusterPolicy: sa-automount-disabled
             -   pod-sa-automount
         -   ClusterPolicy: disallow-latest-tag
             -   no-latest
         -   ClusterPolicy: require-resources-and-probes
             -   resource-limits
-            -   health-probes
 
 ### THE USED ADDONS IN KUBERNETES
     -   metrics-server -> for HPA
@@ -110,17 +110,13 @@
 -   **Allow Requests to Postgres from DB Init Job Network Policy**
     -   Allows the DB Init Job to connect to Postgres for creating the database and initializing tables.
 
-### MANIFESTS OF CLUSTER with ***Kyverno*** (in "cluster" folder)
+### MANIFESTS OF CLUSTER (in "cluster" folder)
 -   **Pod Restriction Cluster Policy**
     -   All Pods must use seccompProfile. Each container must run as non-root, use readOnlyRootFilesystem, have privilege escalation disabled, and drop all Linux capabilities.
--   **Pod AppArmor Cluster Policy**
-    -   Each Pod must have AppArmor enabled.
 -   **Pod Service Account AutoMount Cluster Policy**
     -   Pods must not automatically mount ServiceAccount tokens unless explicitly required.
 -   **Image Will Not Work If It Has Latest Tag Cluster Policy**
     -   Images using the latest tag are disallowed to prevent non-deterministic deployments.
--   **Pod Requires Resources and Probes Cluster Policy**
-    -   Each container must specify CPU/Memory requests & limits, and must include both a ReadinessProbe and LivenessProbe.
 
 ## INSTALL & RUN
 -   **1 - Run "install.sh"**

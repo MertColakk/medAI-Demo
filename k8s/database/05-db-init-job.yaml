@@ -10,24 +10,13 @@ spec:
       restartPolicy: OnFailure
       securityContext:
         runAsNonRoot: true
-        runAsUser: 999          
+        runAsUser: 999
         runAsGroup: 999
         seccompProfile:
           type: RuntimeDefault
       containers:
         - name: psql
           image: postgres:17
-          envFrom:
-            - configMapRef: { name: db-config }
-            - secretRef:    { name: db-secrets }
-          volumeMounts:
-            - name: init-sql
-              mountPath: /init
-              readOnly: true
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
           command: ["/bin/bash","-lc"]
           args:
             - |
@@ -53,6 +42,24 @@ spec:
               test -f /init/init.sql || { echo "ERROR: /init/init.sql not found" >&2; exit 1; }
               echo "Running init.sql ..."
               psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB" --set=ON_ERROR_STOP=1 -f /init/init.sql
+          envFrom:
+            - configMapRef: { name: db-config }
+            - secretRef:    { name: db-secrets }
+          volumeMounts:
+            - name: init-sql
+              mountPath: /init
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests: { cpu: "50m",  memory: "64Mi" }
+            limits:   { cpu: "200m", memory: "256Mi" }
+          securityContext:
+            runAsNonRoot: true                                 
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
       volumes:
         - name: init-sql
           configMap:
@@ -60,3 +67,5 @@ spec:
             items:
               - key: init.sql
                 path: init.sql
+        - name: tmp
+          emptyDir: {}
