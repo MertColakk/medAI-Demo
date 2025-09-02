@@ -90,6 +90,18 @@
     -   "HostPath" volumes must be forbidden. 
     -   "AppArmor" must be applied. -> Kuburnetes "default"
     -   "Seccomp" profile must not be set to uncofined (***Kubernetes applies auto***)
+-   #### Cluster Level
+    -   ##### on Kubernetes
+        -   Use TLS for all API traffic
+    -   ##### on Kyverno
+        -   ###### Policy Types
+            - Cluster Policy:
+            - Cleanup Policy:
+            - Validating Policy:
+            - ImageValidation Policy:
+            - Mutating Policy:
+            - Generating Policy:
+            - Deleting Policy:
 
 ### MANIFESTS OF KUBERNETES (in "core" folder)
 -   **Created a namespace**
@@ -278,7 +290,6 @@ class Model:
 #### 2.3 - Database
 ```python
 class Database:
-    """Postgres helper with connection pool and JSONB logging."""
     def __init__(self):
         dsn = (
             f"dbname={SET.DB_NAME} user={SET.DB_USER} password={SET.DB_PASSWORD} "
@@ -574,4 +585,5 @@ def reconcile(spec, name, namespace, body, **_) -> dict:
 def cleanup(**_) -> None:
     pass
 ```
-
+## TODO
+    -   Kyverno and security detailed research (STATUS: In progress)

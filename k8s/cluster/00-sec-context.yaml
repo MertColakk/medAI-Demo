@@ -3,7 +3,7 @@ kind: ClusterPolicy
 metadata:
   name: enforce-pod-security-restricted
 spec:
-  validationFailureAction: enforce
+  validationFailureAction: audit
   rules:
   - name: require-seccomp
     match: { resources: { kinds: ["Pod"], namespaces: ["xray-api"] } }

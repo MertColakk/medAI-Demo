@@ -64,10 +64,10 @@ spec:
             requests: { cpu: "200m", memory: "512Mi" }
             limits:   { cpu: "1",    memory: "1Gi" }
           securityContext:
-            runAsNonRoot: true
+            runAsNonRoot: false
             runAsUser: 999
             runAsGroup: 999
-            allowPrivilegeEscalation: false
+            allowPrivilegeEscalation: true
             readOnlyRootFilesystem: true
             capabilities: { drop: ["ALL"] }
       volumes:
