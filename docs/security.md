@@ -104,10 +104,10 @@ A Kyverno policy is composed of:
     Mutation policies automatically modify resource manifests during admission.
     - Example: Add automountServiceAccountToken: false if it is not defined, or inject a default securityContext.
     - Ensures consistency without relying on developers to manually add every required field.
-Generate
-  Generation policies create or copy additional Kubernetes resources based on conditions.
-  - Example: When a new Namespace is created, Kyverno can automatically generate a NetworkPolicy or a ResourceQuota.
-  - Useful for default-deny, baseline security, and compliance automation.
+-Generate
+  - Generation policies create or copy additional Kubernetes resources based on conditions.
+    - Example: When a new Namespace is created, Kyverno can automatically generate a NetworkPolicy or a ResourceQuota.
+    - Useful for default-deny, baseline security, and compliance automation.
 
 This structure allows **fine-grained control** at both cluster and namespace level.
 
