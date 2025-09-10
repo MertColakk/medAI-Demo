@@ -218,9 +218,27 @@ Reports help organizations **track drift and enforce standards at scale**.
 * Exceptions managed through dedicated CRDs, RBAC, and TTL.
 * Kyverno controllers deployed redundantly with anti-affinity and webhook timeout tuning.
 
-### GitOps / Argo CD Layer (Not implemented yet)
-* Argo CD self-heal and prune ensure drift correction.
-* Together with Kyverno, they provide strong policy-as-code governance.
+### GitOps / Argo CD Layer 
+Argo CD and Kyverno complement each other by combining declarative GitOps workflows with policy-driven security and compliance:
+  - Self-Healing & Drift Correction
+    - Argo CD continuously compares the live cluster state with the desired state stored in Git.
+    - If a resource is changed manually (e.g., kubectl edit) or drifts due to automation bugs, Argo CD automatically reverts it back to the declared state.
+    - This prevents configuration drift, a common problem in large clusters where resources slowly deviate from the intended design.
+  - Policy-as-Code Enforcement with Kyverno
+    - While Argo CD ensures the what (desired manifests are applied correctly), Kyverno enforces the how (those manifests meet security and compliance rules).
+    - Example: Argo CD syncs a Deployment → Kyverno validates that containers don’t run as root, don’t use :latest tags, and apply proper seccomp profiles.
+  - Defense Against Misconfigurations
+    - Without Kyverno, Argo CD may sync insecure manifests (e.g., privileged containers).
+    - Without Argo CD, Kyverno can enforce rules, but doesn’t guarantee drift correction or that desired manifests are restored if altered.
+    - Together, they prevent both accidental and malicious misconfigurations from persisting in the cluster.
+  - Compliance & Auditability
+    - GitOps ensures all changes flow through Git → audit trail of who changed what, when, and why.
+    - Kyverno produces PolicyReports, allowing organizations to prove compliance with security frameworks (CIS Benchmarks, NIST, PCI-DSS, etc.).
+    - Combined, you gain both audit history and enforcement at runtime.
+  - Operational Efficiency
+    - Argo CD reduces manual ops by automating syncs and rollbacks.
+    - Kyverno reduces human error by mutating manifests (e.g., auto-adding automountServiceAccountToken: false) instead of relying on developers.
+    - Teams spend less time debugging misconfigurations and more time shipping features securely.
 
 ---
 
@@ -232,7 +250,7 @@ It allows teams to **validate, mutate, generate, verify, and clean up** Kubernet
 
 ## KYVERNO WORKFLOW
 ```yaml
-    User[Developer: kubectl apply Pod] --> API[Kubernetes API Server]
+    User[Developer:kubectl apply Pod] --> API[Kubernetes API Server]
     API --> |Admission Request| Kyverno[Kyverno Admission Webhook]
     Kyverno --> |Check Rules| Policy[ClusterPolicy]
     Policy --> |Violation?| Decision{Permit or Deny}
