@@ -1,4 +1,4 @@
---- # Pod level
+# Pod level
 apiVersion: v1
 kind: ResourceQuota
 metadata:
@@ -6,11 +6,11 @@ metadata:
   namespace: xray-api
 spec:
   hard:
-    requests.cpu: "3"
-    requests.memory: 2Gi
+    requests.cpu: "8"
+    requests.memory: 4Gi
     limits.cpu: "6"
-    limits.memory: 12Gi
-    pods: "10"
+    limits.memory: 8Gi
+    pods: "30"
 --- # Container level
 apiVersion: v1
 kind: LimitRange
@@ -21,8 +21,8 @@ spec:
   limits:
     - type: Container
       default:
-        cpu: "1"
-        memory: "2Gi"
+        cpu: "500m"
+        memory: "512Mi"
       defaultRequest:
         cpu: "200m"
-        memory: "512Mi"
+        memory: "256Mi"

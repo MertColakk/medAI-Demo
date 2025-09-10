@@ -1,31 +1,60 @@
-# app.py
-import os
-import json
-import time
-import uuid
-import logging
-import signal
-import threading
-from typing import Any, Dict, List, Optional, Tuple
+# OTHER PAGES (Click for navigate)
+* [Main Page](../README.md)
+* [Security](./security.md)
+* [Code Overviews](./code.md)
 
-from PIL import Image, UnidentifiedImageError, ImageFile
-ImageFile.LOAD_TRUNCATED_IMAGES = True 
+# CONTENTS
+* [AI Model Structure](#ai-model-structure)
+* [AI API](#ai-api)
+* [API Operator](#api-operator)
 
-from flask import Flask, request, jsonify, g
-from werkzeug.middleware.proxy_fix import ProxyFix
-from werkzeug.exceptions import RequestEntityTooLarge
+## CODE REVIEW
+### 1- AI MODEL STRUCTURE
+```python
+model = Sequential([
+    Input(shape=(28, 28, 1)),
 
-import numpy as np
-from keras import models
+    Conv2D(64, (3, 3)),
+    BatchNormalization(),
+    ReLU(),
+    Conv2D(64, (3, 3)),
+    BatchNormalization(),
+    ReLU(),
+    MaxPool2D((2, 2)),
 
-import psycopg2
-import psycopg2.extras
-from psycopg2.pool import SimpleConnectionPool
-from psycopg2 import sql
+    Conv2D(128, (3, 3)),
+    BatchNormalization(),
+    ReLU(),
+    Conv2D(128, (3, 3)),
+    BatchNormalization(),
+    ReLU(),
+    MaxPool2D((2, 2)),
 
-# =========================
-# Config / Settings
-# =========================
+    Flatten(),
+
+    Dense(128, activation="relu"),
+    Dropout(0.2),
+    Dense(self.dataset.num_classes, activation="softmax")
+])
+
+model.compile(
+    optimizer=Adam(learning_rate=1e-3),
+    loss="categorical_crossentropy",
+    metrics=["accuracy"]
+)
+
+callbacks = [
+    EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True),
+    ModelCheckpoint(filepath=os.path.join(self.save_path, "best_model.keras"), monitor="val_loss", save_best_only=True),
+    ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=2, min_lr=1e-5)        
+]
+```
+##### PURPOSE
+A CNN model designed for 28x28 grey images, performing feature extraction with Conv2D layers and classification with Dense layers; trained with Adam optimisation, categorical cross-entropy loss, and early stopping, along with learning rate reduction callbacks via model saving.
+
+### 2 - AI API
+#### 2.1 - Settings 
+```python
 class Settings:
     MODEL_PATH: str = os.getenv("MODEL_PATH", "/app/worker/models/weight.h5")
     CLASSES: List[str] = os.getenv(
@@ -58,38 +87,17 @@ class Settings:
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
 
     READY_CHECK_SQL: str = os.getenv("READY_CHECK_SQL", "SELECT 1")
+```
+##### PURPOSE
+The Settings class reads the application's configuration from environment variables.
+- Model: model path and class labels
+- File upload: maximum number of files, size limit, permitted MIME types
+- Database: connection details (host, port, user, password, schema, connection pool settings)
+- Logging: user, error and access log tables with log level
+- Health check: READY_CHECK_SQL query
 
-SET = Settings()
-
-# =========================
-# Logging (JSON structured)
-# =========================
-class JsonFormatter(logging.Formatter):
-    def format(self, record: logging.LogRecord) -> str:
-        payload = {
-            "ts": self.formatTime(record, datefmt="%Y-%m-%dT%H:%M:%S%z"),
-            "level": record.levelname,
-            "msg": record.getMessage(),
-        }
-        if hasattr(record, "extras") and isinstance(record.extras, dict):
-            payload.update(record.extras)
-        return json.dumps(payload, ensure_ascii=False)
-
-def get_logger(name="app") -> logging.Logger:
-    logger = logging.getLogger(name)
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        handler.setFormatter(JsonFormatter())
-        logger.addHandler(handler)
-        logger.setLevel(SET.LOG_LEVEL)
-        logger.propagate = False
-    return logger
-
-log = get_logger("api")
-
-# =========================
-# Model (thread-safe load)
-# =========================
+#### 2.2 - AI Model
+```python
 class Model:
     _lock = threading.Lock()
     _loaded = False
@@ -116,12 +124,13 @@ class Model:
         preds = self.model.predict(arr, verbose=0)
         idx = int(np.argmax(preds, axis=-1)[0])
         return self.classes[idx]
+```
+##### PURPOSE
+The model class loads the trained network once (thread-safe), scales incoming images to 224×224 dimensions, normalises them, and returns predictions across classes.
 
-# =========================
-# Database (pool + safe SQL)
-# =========================
+#### 2.3 - Database
+```python
 class Database:
-    """Postgres helper with connection pool and JSONB logging."""
     def __init__(self):
         dsn = (
             f"dbname={SET.DB_NAME} user={SET.DB_USER} password={SET.DB_PASSWORD} "
@@ -178,27 +187,12 @@ class Database:
             self.pool.closeall()
         except Exception:
             pass
+```
+##### PURPOSE
+The Database class creates a connection pool for PostgreSQL, securely adds JSON records only to permitted log tables, checks connection health with READY_CHECK_SQL, and manages connections.
 
-# =========================
-# DTOs
-# =========================
-class ErrorDTO:
-    def __init__(self, value, status: int = 400):
-        self.ok = False
-        self.key = "error"
-        self.value = value
-        self.status = status
-
-class SuccessDTO:
-    def __init__(self, value, status: int = 200):
-        self.ok = True
-        self.key = "response"
-        self.value = value
-        self.status = status
-
-# =========================
-# Service
-# =========================
+#### 2.4 - Service
+```python
 class Service:
     def __init__(self):
         self.model = Model()
@@ -294,67 +288,15 @@ class Service:
             self.database.insert_json(table_pair, ip, payload)
         except Exception as e:
             log.warning("log_insert_failed", extra={"extras": {"table": ".".join(table_pair), "error": str(e)}})
+```
+##### PURPOSE
+The service class provides the core business logic of the API. It initialises the model and database components.
+- predict: validates the image(s) received from the client, makes predictions using the model, returns the result, and writes the logs to the database.
+- readyz: checks the health of the model file and database connection.
+- livez: reports the service's live status.
 
-# =========================
-# Flask App
-# =========================
-app = Flask(__name__)
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)  
-app.config["MAX_CONTENT_LENGTH"] = SET.MAX_CONTENT_LENGTH
-
-svc = Service()
-
-# =========================
-# Request ID & Timing Middleware
-# =========================
-@app.before_request
-def _before():
-    g.req_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
-    g.t0 = time.perf_counter()
-
-@app.after_request
-def _after(resp):
-    dur_ms = int((time.perf_counter() - g.get("t0", time.perf_counter())) * 1000)
-    resp.headers["X-Request-ID"] = g.get("req_id", "")
-    resp.headers["X-Content-Type-Options"] = "nosniff"
-    resp.headers["X-Frame-Options"] = "DENY"
-    resp.headers["Referrer-Policy"] = "no-referrer"
-    resp.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
-    try:
-        log.info("access", extra={"extras": {
-            "rid": g.get("req_id"),
-            "path": request.path,
-            "method": request.method,
-            "status": resp.status_code,
-            "duration_ms": dur_ms,
-            "ip": Service.client_ip(request),
-        }})
-    except Exception:
-        pass
-    return resp
-
-# =========================
-# Error Handlers
-# =========================
-@app.errorhandler(RequestEntityTooLarge)
-def _handle_413(e):
-    dto = ErrorDTO(value="Payload too large", status=413)
-    return jsonify({"ok": dto.ok, dto.key: dto.value}), dto.status
-
-@app.errorhandler(404)
-def _handle_404(e):
-    dto = ErrorDTO(value="Not found", status=404)
-    return jsonify({"ok": dto.ok, dto.key: dto.value}), dto.status
-
-@app.errorhandler(Exception)
-def _handle_500(e):
-    log.exception("unhandled_exception", extra={"extras": {"path": request.path}})
-    dto = ErrorDTO(value="Internal server error", status=500)
-    return jsonify({"ok": dto.ok, dto.key: dto.value}), dto.status
-
-# =========================
-# Endpoints
-# =========================
+#### 2.5 - Endpoints
+```python
 @app.route("/api/readyz", methods=["GET"])
 def readyz():
     dto = svc.readyz()
@@ -369,15 +311,140 @@ def livez():
 def predict():
     dto = svc.predict(request)
     return jsonify({"ok": dto.ok, dto.key: dto.value}), dto.status
+```
+### 3 - API OPERATOR
+#### 3.1 - Creating Manifests from Operator
+```python
+# Build service account
+return {
+            "apiVersion": "v1",
+            "kind": "ServiceAccount",
+            "metadata": {"name": f"{self.name}-sa", "namespace": self.ns},
+            "automountServiceAccountToken": self.auto_token,
+        }
+# Build service
+return {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {"name": f"{self.name}-svc", "namespace": self.ns, "labels": {"app": self.name}},
+            "spec": {
+                "type": self.service_type,
+                "selector": {"app": self.name},
+                "ports": [
+                    {"name": self.service_name, "port": self.port, "targetPort": self.port}
+                ],
+            },
+        }
+# Build deployment
+return {
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": {"name": self.name, "namespace": self.ns, "labels": {"app": self.name}},
+            "spec": {
+                "replicas": self.replicas,
+                "selector": {"matchLabels": {"app": self.name}},
+                "template": {
+                    "metadata": pod_meta,
+                    "spec": {
+                        "securityContext": {"seccompProfile": {"type": self.seccomp_type}},
+                        "serviceAccountName": f"{self.name}-sa",
+                        "automountServiceAccountToken": self.auto_token,
+                        "containers": [{
+                            "name": self.name,
+                            "image": self.image,
+                            "imagePullPolicy": self.image_policy,
+                            "ports": [{"containerPort": self.port, "name": self.service_name}],
+                            "envFrom": [
+                                {"configMapRef": {"name": self.config_map}},
+                                {"secretRef": {"name": self.secret}},
+                            ],
+                            "readinessProbe": {
+                                "httpGet": {"path": self.ready, "port": self.port},
+                                "initialDelaySeconds": 5, "periodSeconds": 10,
+                            },
+                            "livenessProbe": {
+                                "httpGet": {"path": self.live, "port": self.port},
+                                "initialDelaySeconds": 10, "periodSeconds": 20,
+                            },
+                            "resources": {
+                                "requests": {"cpu": "300m", "memory": "384Mi"},
+                                "limits":   {"cpu": "1",    "memory": "768Mi"},
+                            },
+                            "securityContext": {
+                                "runAsNonRoot": True,
+                                "runAsUser": 10001, "runAsGroup": 10001,
+                                "allowPrivilegeEscalation": False,
+                                "readOnlyRootFilesystem": True,
+                                "capabilities": {"drop": ["ALL"]},
+                            },
+                            "volumeMounts": [{"name": "tmp", "mountPath": "/tmp"}],
+                        }],
+                        "volumes": [{"name": "tmp", "emptyDir": {}}],
+                    },
+                },
+            },
+        }
+# Build HPA
+return {
+            "apiVersion": "autoscaling/v2",
+            "kind": "HorizontalPodAutoscaler",
+            "metadata": {"name": f"{self.name}-hpa", "namespace": self.ns},
+            "spec": {
+                "scaleTargetRef": {"apiVersion": "apps/v1", "kind": "Deployment", "name": self.name},
+                "minReplicas": self.MIN_REPLICAS,
+                "maxReplicas": self.MAX_REPLICAS,
+                "metrics": [{
+                    "type": "Resource",
+                    "resource": {"name": "cpu",
+                                 "target": {"type": "Utilization", "averageUtilization": self.cpu_target}},
+                }],
+            },
+        }
+# Build PDB
+return {
+            "apiVersion": "policy/v1",
+            "kind": "PodDisruptionBudget",
+            "metadata": {"name": f"{self.name}-pdb", "namespace": self.ns},
+            "spec": {"minAvailable": self.MIN_AVAILABLE,
+                     "selector": {"matchLabels": {"app": self.name}}},
+        }
+```
+##### PURPOSE
+It dynamically generates Operator, ServiceAccount, Service, Deployment, HorizontalPodAutoscaler (HPA) and PodDisruptionBudget (PDB) YAML manifests as Python dictionaries. These manifests define security (seccomp, non-root, read-only filesystem), resource limits, readiness/liveness probes and volume settings.
 
-def _graceful_shutdown(*_):
-    try:
-        svc.database.close()
-    finally:
-        os._exit(0)
+#### 3.2 - Event Handler in workflow: SA -> SVC -> Deployment -> HPA/PDB
+```python
+@kopf.on.create('medai.mertcolakk.io', 'v1alpha1', 'xrayapps')
+@kopf.on.update('medai.mertcolakk.io', 'v1alpha1', 'xrayapps')
+def reconcile(spec, name, namespace, body, **_) -> dict:
+    op = Operator(namespace, name, spec)
 
-signal.signal(signal.SIGTERM, _graceful_shutdown)
-signal.signal(signal.SIGINT, _graceful_shutdown)
+    sa  = op.build_service_account()
+    svc = op.build_service()
+    dep = op.build_deployment()
+    hpa = op.build_hpa()
+    pdb = op.build_pdb()
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8081)
+    for obj in (sa, svc, dep, hpa, pdb):
+        upsert(body, obj)
+
+    d = apps.read_namespaced_deployment(name, namespace)
+    ready = d.status.ready_replicas or 0
+    return {"readyReplicas": ready}
+```
+##### PURPOSE
+When creating/updating a custom resource named xrayapps using the kopf command:
+- ServiceAccount
+- Service
+- Deployment
+- HPA and PDB
+are created or updated respectively. Ultimately, the number of ready replicas in the deployment is returned.
+
+#### 3.3 - On delete (Clean up is auto no need to implement!)
+```python
+@kopf.on.delete('medai.mertcolakk.io', 'v1alpha1', 'xrayapps')
+def cleanup(**_) -> None:
+    pass
+```
+##### PURPOSE
+When a resource is deleted, no additional cleanup code is required; Kyverno automatically removes the resources.

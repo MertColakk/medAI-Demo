@@ -1,0 +1,120 @@
+# 3) RBAC 
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: xray-operator-sa
+  namespace: xray-api
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: xray-operator-role
+rules:
+  - apiGroups: [""]
+    resources: ["services", "serviceaccounts", "events"]
+    verbs: ["get", "list", "watch", "create", "patch", "update"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "patch", "update"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch", "create", "patch", "update"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch", "create", "patch", "update"]
+  - apiGroups: ["medai.mertcolakk.io"]
+    resources: ["xrayapps", "xrayapps/status"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: xray-operator-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: xray-operator-role
+subjects:
+  - kind: ServiceAccount
+    name: xray-operator-sa
+    namespace: xray-api
+---
+# 4) Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xray-operator
+  namespace: xray-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: xray-operator }
+  template:
+    metadata:
+      labels: { app: xray-operator }
+    spec:
+      serviceAccountName: xray-operator-sa
+      automountServiceAccountToken: true       
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: operator
+          image: xray-operator:0.0.1
+          imagePullPolicy: IfNotPresent
+          command: ["kopf"]
+          args:
+          - run
+          - --standalone
+          - --namespace=xray-api         
+          - --log-format=json            
+          - --verbose                    
+          - main.py
+          env:
+            - name: KOPF_LOGLEVEL
+              value: DEBUG
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10002
+            runAsGroup: 10002
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+---
+apiVersion: medai.mertcolakk.io/v1alpha1
+kind: XrayApp
+metadata:
+  name: xray-api
+  namespace: xray-api
+spec:
+  # PDB
+  enablePDB: true
+  minAvailable: 1
+
+  # HPA
+  enableHPA: true
+  replicas: 2
+  minReplicas: 2
+  maxReplicas: 5
+  cpuTarget: 60
+
+  # SA token
+  automountServiceAccountToken: false
+
+  # Service/Port
+  port: 8081
+  serviceType: ClusterIP   
+  serviceName: http
+
+  # Container
+  image: py-api:0.0.1 # api image
+  imagePullPolicy: IfNotPresent
+  readinessPath: /api/readyz
+  livenessPath: /api/livez
+  addAppArmorAnno: false
+  configMapRef: db-config
+  secretRef: db-secrets
+  seccompType: RuntimeDefault

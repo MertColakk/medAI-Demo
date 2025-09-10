@@ -1,0 +1,197 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: audit-pod-security-restricted
+spec:
+  validationFailureAction: Audit
+  rules:
+  - name: require-seccomp
+    match: { resources: { kinds: ["Pod"], namespaces: ["xray-api"] } }
+    validate:
+      message: "Pods must use seccompProfile RuntimeDefault"
+      pattern:
+        spec:
+          securityContext:
+            seccompProfile:
+              type: "RuntimeDefault"
+  - name: require-container-security
+    match: { resources: { kinds: ["Pod"], namespaces: ["xray-api"] } }
+    validate:
+      message: "Containers must run as non-root, readOnlyRootFilesystem, no privilege escalation, drop ALL caps"
+      pattern:
+        spec:
+          containers:
+          - =(name): "*"
+            securityContext:
+              runAsNonRoot: true
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop: ["ALL"]
+  - name: require-limits
+    match: { resources: { kinds: ["Pod"] } }
+    validate:
+      message: "CPU/Memory requests & limits zorunlu"
+      pattern:
+        spec:
+          containers:
+          - resources:
+              requests:
+                memory: "?*"
+                cpu: "?*"
+              limits:
+                memory: "?*"
+                cpu: "?*"
+  - name: no-host-namespaces
+    match: { resources: { kinds: ["Pod"], namespaces: ["xray-api"] } }
+    validate:
+      message: "hostNetwork/IPC/PID forbidden."
+      pattern:
+        spec:
+          =(hostNetwork): "false"
+          =(hostIPC): "false"
+          =(hostPID): "false"
+  - name: disallow-hostpath
+    match: { resources: { kinds: ["Pod"], namespaces: ["xray-api"] } }
+    validate:
+      message: "hostPath volume forbidden."
+      pattern:
+        spec:
+          =(volumes):
+          - X(hostPath): "null"
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: sa-automount-disabled
+spec:
+  validationFailureAction: Enforce
+  rules:
+  - name: pod-sa-automount
+    match:
+      resources:
+        kinds: ["Pod"]
+        namespaces: ["xray-api"]
+    exclude:
+      resources:
+        selector:
+          matchLabels:
+            app: xray-operator   
+    mutate:
+      patchStrategicMerge:
+        spec:
+          automountServiceAccountToken: false
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+spec:
+  validationFailureAction: Enforce
+  rules:
+  - name: no-latest-containers
+    match: { resources: { kinds: ["Pod"], namespaces: ["xray-api"] } }
+    validate:
+      message: "Do not use :latest tags."
+      pattern:
+        spec:
+          containers:
+          - image: "!*:latest"
+  - name: no-latest-init
+    match: { resources: { kinds: ["Pod"], namespaces: ["xray-api"] } }
+    validate:
+      message: "Do not use :latest tags (initContainers)."
+      pattern:
+        spec:
+          =(initContainers):
+          - image: "!*:latest"
+  - name: no-latest-ephemeral
+    match: { resources: { kinds: ["Pod"], namespaces: ["xray-api"] } }
+    validate:
+      message: "Do not use :latest tags (ephemeralContainers)."
+      pattern:
+        spec:
+          =(ephemeralContainers):
+          - image: "!*:latest"
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-semver-like-tags
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: containers-must-use-numeric-tags
+      match:
+        any:
+          - resources:
+              kinds: ["Pod"]
+      validate:
+        message: >-
+          Images must use numeric tags :X or :X.Y or :X.Y.Z (no :latest, and no tagless images).
+        foreach:
+          - list: "request.object.spec.containers[].image"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ (split(element, ':'))[1] || '' }}"
+                    operator: Equals
+                    value: "latest"
+
+                  - key: "{{ length(split(element, ':')) }}"
+                    operator: LessThan
+                    value: 2
+                  - key: "{{ regex_match('^[^:]+:(\\d+)(?:\\.\\d+){0,2}$', element) }}"
+                    operator: Equals
+                    value: false
+
+          - list: "request.object.spec.initContainers[].image"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ (split(element, ':'))[1] || '' }}"
+                    operator: Equals
+                    value: "latest"
+                  - key: "{{ length(split(element, ':')) }}"
+                    operator: LessThan
+                    value: 2
+                  - key: "{{ regex_match('^[^:]+:(\\d+)(?:\\.\\d+){0,2}$', element) }}"
+                    operator: Equals
+                    value: false
+
+          - list: "request.object.spec.ephemeralContainers[].image"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ (split(element, ':'))[1] || '' }}"
+                    operator: Equals
+                    value: "latest"
+                  - key: "{{ length(split(element, ':')) }}"
+                    operator: LessThan
+                    value: 2
+                  - key: "{{ regex_match('^[^:]+:(\\d+)(?:\\.\\d+){0,2}$', element) }}"
+                    operator: Equals
+                    value: false
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-image-registries
+spec:
+  validationFailureAction: Audit   
+  rules:
+  - name: only-allowed-registries
+    match: { resources: { kinds: ["Pod"], namespaces: ["xray-api"] } }
+    validate:
+      message: "Only allowed registeries"
+      anyPattern:
+      - spec:
+          containers:
+          - image: "docker.io/*" # ur teams images
+      - spec:
+          containers:
+          - image: "localhost:5000/*"     # if u have local images
+      - spec:
+          containers:
+          - image: "postgres:*"           # postgresql

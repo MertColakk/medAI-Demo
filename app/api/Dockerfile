@@ -4,6 +4,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc build-essential && rm -rf /var/lib/apt/lists/*
+
 RUN useradd -u 10001 -m appuser
 
 COPY requirements.txt /tmp/requirements.txt
@@ -17,7 +20,7 @@ ENV MODEL_PATH=/app/api/models/weight.h5 \
     TF_NUM_INTRAOP_THREADS=2 \
     TF_NUM_INTEROP_THREADS=2
 
-EXPOSE 8001
+EXPOSE 8081
 
 USER 10001
 

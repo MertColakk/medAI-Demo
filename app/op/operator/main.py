@@ -18,29 +18,29 @@ class Operator:
         self.spec = spec or {}
 
         # --- Parse ---
-        self.enable_pdb    = bool(self.spec.get("enablePDB"))
-        self.MIN_AVAILABLE = int(self.spec.get("minAvailable"))
+        self.enable_pdb    = bool(self.spec.get("enablePDB", True))
+        self.MIN_AVAILABLE = int(self.spec.get("minAvailable", 1))
 
-        self.enable_hpa   = bool(self.spec.get("enableHPA"))
-        self.replicas     = int(self.spec.get("replicas"))
-        self.MIN_REPLICAS = int(self.spec.get("minReplicas"))
-        self.MAX_REPLICAS = int(self.spec.get("maxReplicas"))
-        self.cpu_target   = int(self.spec.get("cpuTarget"))
+        self.enable_hpa   = bool(self.spec.get("enableHPA", True))
+        self.replicas     = int(self.spec.get("replicas", 2))
+        self.MIN_REPLICAS = int(self.spec.get("minReplicas", 1))
+        self.MAX_REPLICAS = int(self.spec.get("maxReplicas", 3))
+        self.cpu_target   = int(self.spec.get("cpuTarget", 70))
 
-        self.auto_token   = bool(self.spec.get("automountServiceAccountToken"))
+        self.auto_token   = bool(self.spec.get("automountServiceAccountToken", False))
 
-        self.port         = int(self.spec.get("port"))
-        self.service_type = str(self.spec.get("serviceType"))
-        self.service_name = str(self.spec.get("serviceName"))
+        self.port         = int(self.spec.get("port", 8081))
+        self.service_type = str(self.spec.get("serviceType", "ClusterIP"))
+        self.service_name = str(self.spec.get("serviceName", "http"))
 
-        self.image        = str(self.spec.get("image"))
-        self.image_policy = str(self.spec.get("imagePullPolicy"))
-        self.ready        = str(self.spec.get("readinessPath"))
-        self.live         = str(self.spec.get("livenessPath"))
-        self.add_app_armor = bool(self.spec.get("addAppArmorAnno"))
-        self.config_map   = str(self.spec.get("configMapRef"))
-        self.secret       = str(self.spec.get("secretRef"))
-        self.seccomp_type = str(self.spec.get("seccompType"))
+        self.image        = str(self.spec.get("image", "py-api:0.0.1"))
+        self.image_policy = str(self.spec.get("imagePullPolicy", "Always"))
+        self.ready        = str(self.spec.get("readinessPath", "/api/readyz"))
+        self.live         = str(self.spec.get("livenessPath", "/api/livez"))
+        self.add_app_armor = bool(self.spec.get("addAppArmorAnno", False))
+        self.config_map   = str(self.spec.get("configMapRef", "db-config"))
+        self.secret       = str(self.spec.get("secretRef", "db-secrets"))
+        self.seccomp_type = str(self.spec.get("seccompType", "RuntimeDefualt"))
 
     # ---------- Manifests ----------
     def build_service_account(self) -> dict:
@@ -55,7 +55,7 @@ class Operator:
         return {
             "apiVersion": "v1",
             "kind": "Service",
-            "metadata": {"name": f"{self.name}-svc", "namespace": self.ns, "labels": {"app": self.name}},
+            "metadata": {"name": f"{self.name}-svc", "namespace": self.ns, "labels": {"app": self.name, "protected": "true"}},
             "spec": {
                 "type": self.service_type,
                 "selector": {"app": self.name},
@@ -96,11 +96,11 @@ class Operator:
                             ],
                             "readinessProbe": {
                                 "httpGet": {"path": self.ready, "port": self.port},
-                                "initialDelaySeconds": 5, "periodSeconds": 10,
+                                "initialDelaySeconds": 20, "periodSeconds": 30,
                             },
                             "livenessProbe": {
                                 "httpGet": {"path": self.live, "port": self.port},
-                                "initialDelaySeconds": 10, "periodSeconds": 20,
+                                "initialDelaySeconds": 20, "periodSeconds": 40,
                             },
                             "resources": {
                                 "requests": {"cpu": "300m", "memory": "384Mi"},
@@ -195,6 +195,7 @@ def upsert(owner, obj) -> None:
 # ---------- Kopf event handlers ----------
 @kopf.on.create('medai.mertcolakk.io', 'v1alpha1', 'xrayapps')
 @kopf.on.update('medai.mertcolakk.io', 'v1alpha1', 'xrayapps')
+@kopf.on.resume('medai.mertcolakk.io', 'v1alpha1', 'xrayapps')
 def reconcile(spec, name, namespace, body, **_) -> dict:
     op = Operator(namespace, name, spec)
 

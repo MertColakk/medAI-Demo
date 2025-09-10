@@ -1,0 +1,25 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: deny-deletes-from-users
+spec:
+  matchConstraints:
+    resourceRules:
+      - apiGroups:   ["*"]
+        apiVersions: ["*"]
+        operations:  ["DELETE","CREATE","UPDATE"]
+        resources:   ["*"]
+  validations:
+    - expression: |
+        request.userInfo.username.startsWith("system:serviceaccount:") ||
+        request.userInfo.username.startsWith("system:node:")
+      message: "Only service accounts and nodes may CREATE/UPDATE/DELETE"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: deny-deletes-from-users-binding
+spec:
+  policyName: deny-deletes-from-users
+  validationActions:
+    - Deny

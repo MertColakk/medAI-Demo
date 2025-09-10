@@ -8,6 +8,9 @@ RUN useradd -u 10002 -m appuser
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc build-essential && rm -rf /var/lib/apt/lists/*
+
 COPY operator/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 

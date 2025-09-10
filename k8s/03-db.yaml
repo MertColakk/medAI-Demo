@@ -1,8 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-config
+  namespace: xray-api
+data:
+  DB: "xray"
+  DB_HOST: "postgres-hl"
+  DB_PORT: "5432"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-secrets
+  namespace: xray-api
+immutable: true
+type: Opaque
+stringData:
+  DB_USER: "xray_user"
+  DB_PASSWORD: "12345"
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgres
   namespace: xray-api
+  labels:
+    protected: "true"
 spec:
   serviceName: postgres-hl
   replicas: 1
@@ -64,10 +87,10 @@ spec:
             requests: { cpu: "200m", memory: "512Mi" }
             limits:   { cpu: "1",    memory: "1Gi" }
           securityContext:
-            runAsNonRoot: false
+            runAsNonRoot: true
             runAsUser: 999
             runAsGroup: 999
-            allowPrivilegeEscalation: true
+            allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: { drop: ["ALL"] }
       volumes:
@@ -83,3 +106,18 @@ spec:
         resources:
           requests:
             storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-hl
+  namespace: xray-api
+  labels: { app: postgres }
+spec:
+  clusterIP: None
+  selector:
+    app: postgres
+  ports:
+    - name: pg
+      port: 5432
+      targetPort: 5432

@@ -1,0 +1,188 @@
+--- # 0) Varsayılan her şeyi reddet (Ingress + Egress)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: xray-api
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress","Egress"]
+
+--- # 1) DNS egress (tüm pod'lar için gerekli)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: xray-api
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns     # CoreDNS genellikle bu label'la gelir
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+--- # 2) Dışarıdan -> API (8081). 'from' boş: herkes 8081'e erişebilir (NodePort/ClusterIP/port-forward senaryoları)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-public-ingress
+  namespace: xray-api
+spec:
+  podSelector:
+    matchLabels:
+      app: xray-api
+  policyTypes: ["Ingress"]
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8081
+
+--- # 3) API -> Postgres (5432) egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-egress-to-db
+  namespace: xray-api
+spec:
+  podSelector:
+    matchLabels:
+      app: xray-api
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres        # Postgres pod label'ını doğrula
+      ports:
+        - protocol: TCP
+          port: 5432
+
+--- # 4) Postgres <- (API) (5432) ingress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-db-ingress
+  namespace: xray-api
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres              # Postgres pod label'ı
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: xray-api
+      ports:
+        - protocol: TCP
+          port: 5432
+--- # 5) Operator <- (API)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-operator-api
+  namespace: xray-api
+spec:
+  podSelector:
+    matchLabels:
+      app: xray-operator              
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: xray-api
+      ports:
+        - protocol: TCP
+          port: 8081
+--- # 6) API <- (Operator)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-operator-egress-apiserver
+  namespace: xray-api
+spec:
+  podSelector:
+    matchLabels:
+      app: xray-operator
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - ipBlock: { cidr: 10.96.0.1/32 }      # ← DOOR
+      ports:
+        - { protocol: TCP, port: 443 }
+    - to:
+        - ipBlock: { cidr: 192.168.49.2/32 }   # ← ENDP 
+      ports:
+        - { protocol: TCP, port: 443 }
+--- # 6) Operator -> Kubernetes API Server (443) egress for kopf
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-operator-egress-apiserver
+  namespace: xray-api
+spec:
+  podSelector:
+    matchLabels:
+      app: xray-operator
+  policyTypes: ["Egress"]
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+---
+# Kyverno default deny
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kyverno-default-deny
+  namespace: kyverno
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress","Egress"]
+---
+# Access kyverno in kubernetes
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kyverno-allow-dns
+  namespace: kyverno
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - { protocol: UDP, port: 53 }
+    - { protocol: TCP, port: 53 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kyverno-allow-apiserver
+  namespace: kyverno
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+  - to:
+    - ipBlock: { cidr: 10.96.0.1/32 }      
+    - ipBlock: { cidr: 192.168.49.2/32 }   
+    ports:
+    - { protocol: TCP, port: 443 }
