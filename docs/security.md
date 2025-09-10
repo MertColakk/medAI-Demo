@@ -19,6 +19,7 @@
 ### General
 #### 1. Kubernetes Admission Workflow with Kyverno
 ![Kyverno Workflow](https://kyverno.io/images/kubernetes-admission-controllers.png)
+
 This diagram shows the **general Kubernetes admission control process** and how Kyverno fits into it.
 
 * A developer submits a manifest (e.g., Pod, Deployment).
@@ -32,6 +33,7 @@ Kyverno acts as a **Validating and Mutating Admission Webhook**, enforcing secur
 
 #### 2. JSON Validation Flow in Kyverno
 ![Kyverno Workflow Basic Explanation](https://neonmirrors.net/images/2023-07/experimental-generic-json-validation-with-kyverno/json-flow.png)
+
 This diagram breaks down the **admission webhook evaluation process**:
 
 * User request → Kubernetes API server → Kyverno webhook.
@@ -45,6 +47,7 @@ This highlights how Kyverno works **with raw JSON manifests** and applies its po
 
 #### 3. Kyverno Policy Management Lifecycle
 ![Policy Management](https://miro.medium.com/v2/resize\:fit:1200/0*6fKcb22njWeWcwnu.png)
+
 This image explains the **policy management lifecycle**:
 * **Define**: Policies are written in YAML (`ClusterPolicy`, `Policy`).
 * **Distribute**: Applied via GitOps or kubectl.
@@ -58,6 +61,7 @@ It shows that Kyverno policies are **living documents** — continuously enforce
 ### Controllers
 #### 4. Admission Controller Phases
 ![Admission Controller Phases](https://cdn.thenewstack.io/media/2023/05/d88945c4-image1a.jpg)
+
 Kyverno consists of **multiple controllers**, each handling a specific responsibility:
 * **Admission Controller**: Handles real-time admission requests (`validate`, `mutate`, `verifyImage`).
 * **Background Controller**: Applies policies to existing resources in the cluster.
@@ -70,6 +74,7 @@ This diagram shows how Kyverno runs as **a set of controllers**, not just a sing
 
 #### 5. Cleanup and Temporary Policy Architecture
 ![Cleanup Policy and Temporary Policy](https://neonmirrors.net/images/2023-02/policy-exception-expiration/architecture.png)
+
 This architecture diagram explains **Kyverno’s Cleanup Policies and Policy Exceptions**:
 * Policies can have **time-based lifecycles** (e.g., expire after 24h).
 * This is useful for **temporary exceptions** — e.g., allowing a developer to bypass a policy just for debugging.
@@ -82,6 +87,7 @@ This ensures that **temporary policies don’t become permanent security gaps**.
 ### Policies
 #### 6. Policy and Rule Structure
 ![Policy and Rules](https://release-1-12-0.kyverno.io/images/Kyverno-Policy-Structure.png)
+
 A Kyverno policy is composed of:
 * **Policy (ClusterPolicy / Policy)** → top-level object.
 * **Rules** → each rule targets certain resources and applies validation, mutation, generation, or verification.
@@ -105,25 +111,58 @@ Generate
 
 This structure allows **fine-grained control** at both cluster and namespace level.
 
-- Comparison table about policy types:
-| **Policy Type** | **Purpose**                                                      | **Example Use Case**                                                                                             | **Effect on Resources**                                                                                       |
-| --------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **Validate**    | Ensures resources comply with security and governance rules.     | - Deny Pods running as root. <br>- Forbid use of `:latest` image tags.                                           | - In **Audit mode**: violation logged, resource still created. <br>- In **Enforce mode**: resource is denied. |
-| **Mutate**      | Automatically modifies manifests to meet policy requirements.    | - Add `automountServiceAccountToken: false`. <br>- Inject default `securityContext`.                             | - Resource is admitted, but fields are patched or added before creation.                                      |
-| **Generate**    | Creates or copies new resources automatically based on triggers. | - Generate a `NetworkPolicy` when a Namespace is created. <br>- Apply default `ResourceQuota` to new Namespaces. | - Additional Kubernetes objects are created alongside the requested resource.                                 |
+- **Comparison table about policy types:**
+  - Validate
+    - Purpose: Ensures resources comply with security and governance rules.
+      Example Use Cases:
+        - Deny Pods running as root.
+        - Forbid use of :latest image tags.
+      Effect on Resources:
+        - In Audit mode: violation logged, resource still created.
+        - In Enforce mode: resource is denied.
+  - Mutate
+    - Purpose: Automatically modifies manifests to meet policy requirements.
+      Example Use Cases:
+        - Add automountServiceAccountToken: false.
+        - Inject default securityContext.
+    Effect on Resources:
+    - Resource is admitted, but fields are patched or added before creation.
+  - Generate
+    - Purpose: Creates or copies new resources automatically based on triggers.
+      Example Use Cases:
+      - Generate a NetworkPolicy when a Namespace is created.
+      - Apply default ResourceQuota to new Namespaces.
+      Effect on Resources:
+      - Additional Kubernetes objects are created alongside the requested resource.                          |
 
-- Comparison table about policy modes:
-| **Mode**    | **Purpose**                                                       | **Behavior on Policy Violation**                                                                          | **When to Use**                                                                                                       | **Example**                                                            |
-| ----------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| **Audit**   | Monitor and report violations without blocking resources.         | - Resource is still created/updated. <br>- Violation is logged in `PolicyReport` / `ClusterPolicyReport`. | - Testing new policies in staging. <br>- Observing impact before enforcing. <br>- Compliance reporting in production. | Pod with `:latest` image is admitted but violation appears in reports. |
-| **Enforce** | Strictly enforce compliance by blocking non-conforming resources. | - Resource creation/update is denied. <br>- Violation prevents resource admission.                        | - Production clusters with mature policies. <br>- Critical security and compliance requirements.                      | Pod with `:latest` image is **rejected** and not created.              |
+- **Comparison table about policy modes:**
+  - Audit
+    - Purpose: Monitor and report violations without blocking resources.
+    Behavior on Violation:
+      - Resource is still created/updated.
+      - Violation is logged in PolicyReport / ClusterPolicyReport.
+    When to Use:
+      - Testing new policies in staging.
+      - Observing impact before enforcing.
+      - Compliance reporting in production.
+    Example: A Pod with ":latest"image is admitted but violation appears in reports.
+  - Enforce
+    - Purpose: Strictly enforce compliance by blocking non-conforming resources.
+    Behavior on Violation:
+      - Resource creation/update is denied.
+      - Violation prevents resource admission.
+    When to Use:
+      - Production clusters with mature policies.
+      - Critical security and compliance requirements.
+    Example: A Pod with ":latest" image is rejected and not created.
 
 ---
 
 #### 7. Verify Image Policy
 ![Verify Image Policy](https://release-1-9-0.kyverno.io/images/image-verify-rule.png)
+
 This diagram explains **image verification policies**:
-* Ensures images are signed (e.g., Cosign, Notary).
+* Ensures images are signed (e.g. Cosign).
 * Restricts what registries images can come from.
 * Blocks use of untrusted or unsigned images.
 
@@ -133,6 +172,7 @@ This is critical for **supply chain security**, ensuring only verified container
 
 #### 8. Mutation Policy
 ![Mutation Policy](https://miro.medium.com/v2/resize\:fit:1400/1*pga79LRRmVn2hgmpdYFj_A.png)
+
 Mutation policies allow Kyverno to **patch manifests automatically**.
 Examples:
 * Add securityContext fields (`runAsNonRoot: true`).
@@ -145,6 +185,7 @@ This reduces human error — developers don’t need to remember every security 
 
 #### 9. Report Policy
 ![Report Policy](https://higherlogicdownload.s3.amazonaws.com/IMWUC/UploadedImages/54MZ8FrRZ6bJincYApY0_Screenshot%202025-08-12%20at%204.56.17%E2%80%AFAM-L.png)
+
 Kyverno generates **PolicyReports** and **ClusterPolicyReports** that summarize compliance:
 * Show how many resources passed or failed each rule.
 * Exportable to dashboards (Prometheus, Grafana, SIEM tools).
@@ -190,7 +231,7 @@ It allows teams to **validate, mutate, generate, verify, and clean up** Kubernet
 ---
 
 ## KYVERNO WORKFLOW
-```mermaid
+```yaml
     User[Developer: kubectl apply Pod] --> API[Kubernetes API Server]
     API --> |Admission Request| Kyverno[Kyverno Admission Webhook]
     Kyverno --> |Check Rules| Policy[ClusterPolicy]
@@ -213,7 +254,9 @@ It allows teams to **validate, mutate, generate, verify, and clean up** Kubernet
 ---
 
 ## KYVERNO MANIFEST IMPLEMENTATIONS
+
 ### 1. Pod Security Policies
+
 #### 1.1 Audit Pod Security Restricted
 ```yaml
 apiVersion: kyverno.io/v1
@@ -248,6 +291,7 @@ spec:
 ---
 
 ### 2. Service Account Security
+
 #### 2.1 Disable Automount of ServiceAccount Tokens
 ```yaml
 apiVersion: kyverno.io/v1
@@ -275,6 +319,7 @@ spec:
 ---
 
 ### 3. Image Governance Policies
+
 #### 3.1 Disallow Latest Tag
 ```yaml
 apiVersion: kyverno.io/v1
@@ -364,6 +409,7 @@ spec:
 ---
 
 ## ADVANTAGES AND LIMITATIONS OF KYVERNO
+
 ### + Advantages
 * **Versatile**: Supports validation, mutation, generation, image verification, and cleanup.
 * **Audit-first approach**: Safe rollout with audit before enforcement.

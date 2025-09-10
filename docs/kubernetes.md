@@ -1,6 +1,6 @@
 # OTHER PAGES (Click for navigate)
 * [Main Page](../README.md)
-*[Security](./security.md)
+* [Security(Kyverno)](./security.md)
 * [Code Overviews](./code.md)
 
 # CONTENTS
@@ -69,6 +69,7 @@
     -   Image Classification API Operator
 
 ## KUBERNETES MANIFESTS DESCRIPTIONS
+
 ### MANIFESTS OF CORE 
 -   **Created a namespace**
     -   A namespace is created for workload isolation.

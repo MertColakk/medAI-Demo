@@ -1,6 +1,6 @@
 # OTHER PAGES (Click for navigate)
 * [Main Page](../README.md)
-* [Security](./security.md)
+* [Security(Kyverno)](./security.md)
 * [Code Overviews](./code.md)
 
 # CONTENTS
