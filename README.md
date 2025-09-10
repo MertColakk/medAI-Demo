@@ -1,15 +1,14 @@
 # OTHER PAGES (Click for navigate)
-    -   [Kubernetes](./docs/kubernetes.md)
-    -   [Security with Kyverno](./docs/security.md)
-    -   [Code Overviews](./docs/code.md)
+* [Kubernetes](./docs/kubernetes.md)
+* [Security with Kyverno](./docs/security.md)
+* [Code Overviews](./docs/code.md)
 
 # CONTENTS
-    -   [Project Description](#project-description)
-    -   [Install & Run](#install--run)
-    -   [To Do](#todo)
+* [Project Description](#project-description)
+* [Install & Run](#install--run)
+* [To Do](#todo)
     
 ## PROJECT DESCRIPTION
-
 ### TECHNOLOGIES WHICH ARE USED
     -   PostgreSQL
     -   Python
